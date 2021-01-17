@@ -17,7 +17,7 @@ namespace SkImageResizer
         /// <param name="sourcePath">圖片來源目錄路徑</param>
         /// <param name="destPath">產生圖片目的目錄路徑</param>
         /// <param name="scale">縮放比例</param>
-        public void ResizeImages(string sourcePath, string destPath, double scale)
+        public void ResizeImages(string sourcePath, string destPath, double scale, CancellationToken ctsToken)
         {
             if (!Directory.Exists(destPath))
             {
@@ -27,6 +27,7 @@ namespace SkImageResizer
             var allFiles = FindImages(sourcePath);
             foreach (var filePath in allFiles)
             {
+                ctsToken.ThrowIfCancellationRequested();
                 var bitmap = SKBitmap.Decode(filePath);
                 var imgPhoto = SKImage.FromBitmap(bitmap);
                 var imgName = Path.GetFileNameWithoutExtension(filePath);
@@ -37,6 +38,7 @@ namespace SkImageResizer
                 var destinationWidth = (int)(sourceWidth * scale);
                 var destinationHeight = (int)(sourceHeight * scale);
 
+                ctsToken.ThrowIfCancellationRequested();
                 using var scaledBitmap = bitmap.Resize(
                     new SKImageInfo(destinationWidth, destinationHeight),
                     SKFilterQuality.High);
@@ -47,6 +49,7 @@ namespace SkImageResizer
             }
         }
 
+        /*
         // 讓應用端給個非同步方法
         // 但其實內部也沒非同步=>也沒能變快
         public Task ResizeImages2Async(string sourcePath, string destPath, double scale)
@@ -68,10 +71,11 @@ namespace SkImageResizer
             ResizeImages(sourcePath, destPath, scale);
             return Task.CompletedTask;
         }
+        */
 
         // 內容也非同步
         // 讚讚
-        public Task ResizeImagesAsync(string sourcePath, string destPath, double scale)
+        public Task ResizeImagesAsync(string sourcePath, string destPath, double scale, CancellationToken ctsToken)
         {
             if (!Directory.Exists(destPath))
             {
@@ -82,12 +86,12 @@ namespace SkImageResizer
             var tasks = new List<Task>();
             foreach (var filePath in allFiles)
             {
-                tasks.Add(ProcessImageAsync(filePath, destPath, scale));
+                tasks.Add(ProcessImageAsync(filePath, destPath, scale, ctsToken));
             }
             return Task.WhenAll(tasks);
         }
 
-        public static Task ProcessImageAsync(string filePath, string destPath, double scale)
+        public static Task ProcessImageAsync(string filePath, string destPath, double scale, CancellationToken ctsToken)
         {
             return Task.Run(async () =>
             {
@@ -110,11 +114,12 @@ namespace SkImageResizer
                     using var scaledImage = SKImage.FromBitmap(scaledBitmap);
                     return scaledImage.Encode(SKEncodedImageFormat.Jpeg, 100);
                 });
-
+                ctsToken.ThrowIfCancellationRequested();
                 var task2 = Task.Run(() =>
                 {
                     return File.OpenWrite(Path.Combine(destPath, imgName + ".jpg"));
                 });
+                ctsToken.ThrowIfCancellationRequested();
                 List<Task> tasks = new List<Task>();
                 tasks.Add(task1);
                 tasks.Add(task2);
@@ -122,6 +127,7 @@ namespace SkImageResizer
                 using var data = task1.Result;
                 using var s = task2.Result;
                 data.SaveTo(s);
+                ctsToken.ThrowIfCancellationRequested();
             });
         }
 

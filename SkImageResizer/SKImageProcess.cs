@@ -47,6 +47,30 @@ namespace SkImageResizer
             }
         }
 
+        // 讓應用端給個非同步方法
+        // 但其實內部也沒非同步=>也沒能變快
+        public Task ResizeImages2Async(string sourcePath, string destPath, double scale)
+        {
+            return Task.Run(() => ResizeImages(sourcePath, destPath, scale));
+        }
+
+        // 沒必要的寫法
+        // 裝套件避免這樣寫!
+        public async Task ResizeImages3Async(string sourcePath, string destPath, double scale)
+        {
+            await Task.Run(() => ResizeImages(sourcePath, destPath, scale));
+        }
+
+        // 這根本沒用到非同步
+        // 還是一條Thread跑天下
+        public Task ResizeImages4Async(string sourcePath, string destPath, double scale)
+        {
+            ResizeImages(sourcePath, destPath, scale);
+            return Task.CompletedTask;
+        }
+
+        // 內容也非同步
+        // 讚讚
         public Task ResizeImagesAsync(string sourcePath, string destPath, double scale)
         {
             if (!Directory.Exists(destPath))
